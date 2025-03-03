@@ -48,10 +48,12 @@ export class RestAPIStack extends cdk.Stack {
         memorySize: 128,
         environment: {
           TABLE_NAME: moviesTable.tableName,
+          CAST_TABLE_NAME: movieCastsTable.tableName,
           REGION: 'eu-west-1',
         },
       }
     );
+    
 
     const getAllMoviesFn = new lambdanode.NodejsFunction(
       this,
@@ -90,6 +92,7 @@ export class RestAPIStack extends cdk.Stack {
     // Permissions 
     moviesTable.grantReadData(getMovieByIdFn)
     moviesTable.grantReadData(getAllMoviesFn)
+    movieCastsTable.grantReadData(getMovieByIdFn);
     // REST API 
     const api = new apig.RestApi(this, "RestAPI", {
       description: "demo api",
