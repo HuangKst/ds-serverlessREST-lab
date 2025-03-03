@@ -21,7 +21,7 @@ export class RestAPIStack extends cdk.Stack {
       tableName: "Movies",
     });
 
-    
+
     // Functions 
     const getMovieByIdFn = new lambdanode.NodejsFunction(
       this,
@@ -37,45 +37,45 @@ export class RestAPIStack extends cdk.Stack {
           REGION: 'eu-west-1',
         },
       }
-      );
-      
-      const getAllMoviesFn = new lambdanode.NodejsFunction(
-        this,
-        "GetAllMoviesFn",
-        {
-          architecture: lambda.Architecture.ARM_64,
-          runtime: lambda.Runtime.NODEJS_18_X,
-          entry: `${__dirname}/../lambdas/getAllMovies.ts`,
-          timeout: cdk.Duration.seconds(10),
-          memorySize: 128,
-          environment: {
-            TABLE_NAME: moviesTable.tableName,
-            REGION: 'eu-west-1',
+    );
+
+    const getAllMoviesFn = new lambdanode.NodejsFunction(
+      this,
+      "GetAllMoviesFn",
+      {
+        architecture: lambda.Architecture.ARM_64,
+        runtime: lambda.Runtime.NODEJS_18_X,
+        entry: `${__dirname}/../lambdas/getAllMovies.ts`,
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: moviesTable.tableName,
+          REGION: 'eu-west-1',
+        },
+      }
+    );
+
+    new custom.AwsCustomResource(this, "moviesddbInitData", {
+      onCreate: {
+        service: "DynamoDB",
+        action: "batchWriteItem",
+        parameters: {
+          RequestItems: {
+            [moviesTable.tableName]: generateBatch(movies),
           },
-        }
-        );
-        
-        new custom.AwsCustomResource(this, "moviesddbInitData", {
-          onCreate: {
-            service: "DynamoDB",
-            action: "batchWriteItem",
-            parameters: {
-              RequestItems: {
-                [moviesTable.tableName]: generateBatch(movies),
-              },
-            },
-            physicalResourceId: custom.PhysicalResourceId.of("moviesddbInitData"), //.of(Date.now().toString()),
-          },
-          policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
-            resources: [moviesTable.tableArn],
-          }),
-        });
-        
-        // Permissions 
-        moviesTable.grantReadData(getMovieByIdFn)
-        moviesTable.grantReadData(getAllMoviesFn)
-             // REST API 
-     const api = new apig.RestApi(this, "RestAPI", {
+        },
+        physicalResourceId: custom.PhysicalResourceId.of("moviesddbInitData"), //.of(Date.now().toString()),
+      },
+      policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
+        resources: [moviesTable.tableArn],
+      }),
+    });
+
+    // Permissions 
+    moviesTable.grantReadData(getMovieByIdFn)
+    moviesTable.grantReadData(getAllMoviesFn)
+    // REST API 
+    const api = new apig.RestApi(this, "RestAPI", {
       description: "demo api",
       deployOptions: {
         stageName: "dev",
@@ -99,9 +99,33 @@ export class RestAPIStack extends cdk.Stack {
       "GET",
       new apig.LambdaIntegration(getMovieByIdFn, { proxy: true })
     );
-    
-        
-      }
+   
 
-      
-    }
+
+    const newMovieFn = new lambdanode.NodejsFunction(this, "AddMovieFn", {
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_16_X,
+      entry: `${__dirname}/../lambdas/addMovie.ts`,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        TABLE_NAME: moviesTable.tableName,
+        REGION: "eu-west-1",
+      },
+    });
+    // other permissions ....
+    moviesTable.grantReadWriteData(newMovieFn)
+    moviesEndpoint.addMethod(
+      "POST",
+      new apig.LambdaIntegration(newMovieFn, { proxy: true })
+    );
+
+    
+
+
+
+
+  }
+
+
+}
